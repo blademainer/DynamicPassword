@@ -5,11 +5,31 @@ import com.xiongyingqi.util.Base64;
 import com.xiongyingqi.util.ByteHelper;
 import com.xiongyingqi.util.DateHelper;
 
+/**
+ * 基于密钥和时间生成动态密码
+ * @author xiongyingqi <a href="http://xiongyingqi.com">xiongyingqi.com</a>
+ * @version 2014-2-11 下午9:08:39
+ */
 public class DynamicPassword {
+    /**
+     * 密钥长度
+     */
     public static final int KEY_LENGTH = 16;
+    /**
+     * 最小单位（秒）
+     */
     private static final int SECOND = 1000;
-    private static final int DEFAULT_REFRESH_TIME = 60;
+    /**
+     * 默认密码刷新时间
+     */
+    private static final int DEFAULT_REFRESH_TIME = 4;
 
+    /**
+     * 随机生成指定长度字节数的密钥
+     * <br>2014-2-11 下午9:10:17
+     * @param length
+     * @return byte[]
+     */
     public static byte[] generateKey(int length) {
 	if (length <= 0) {
 	    throw new IllegalArgumentException("长度为：" + length + "， 指定的密钥长度错误！");
@@ -23,10 +43,17 @@ public class DynamicPassword {
 	return bts;
     }
 
+    
     public static byte[] getTimeBytes() {
 	return getTimeBytes(DEFAULT_REFRESH_TIME);
     }
 
+    /**
+     * 根据指定的时间刷新周期获取时间字节
+     * <br>2014-2-11 下午9:13:21
+     * @param seconds
+     * @return
+     */
     public static byte[] getTimeBytes(int seconds) {
 	if (seconds <= 0) {
 	    throw new IllegalArgumentException("秒数为：" + seconds
@@ -34,7 +61,8 @@ public class DynamicPassword {
 	}
 	long currentTimeMillis = System.currentTimeMillis();
 	// System.out.println(currentTimeMillis);
-	currentTimeMillis /= seconds * SECOND;// 对秒数取整
+	// 对秒数取整，比如seconds=30，那么21点00分18秒与21点00分29秒是相同的结果
+	currentTimeMillis /= seconds * SECOND;
 
 	// long currentTimeMillisRs = currentTimeMillis * seconds *
 	// SECOND;//还原时间位数
@@ -46,8 +74,14 @@ public class DynamicPassword {
 	return ByteHelper.longToBytes(currentTimeMillis);
     }
 
-    public static byte[] generateCode(byte[] key) {
-	byte[] bs = getTimeBytes();
+    /**
+     * 对字节进行迭代运算，这样结果就不具备规律性
+     * <br>2014-2-11 下午9:14:18
+     * @param key
+     * @return
+     */
+    public static byte[] generateCode(byte[] key, int refreshTime) {
+	byte[] bs = getTimeBytes(refreshTime);
 	int length = bs.length;
 	for (int i = 0; i < length; i++) {
 	    byte b = bs[i];
@@ -111,13 +145,12 @@ public class DynamicPassword {
 		rs[j] ^= bts[index + k];
 	    }
 	}
-	System.out.println(rs.length);
-	
-	System.out.println("index ========== " + index);
-	System.out.println("leastLength ========== " + leastLength);
-	System.out.println("multiple ========== " + multiple);
-	System.out.println("inputLength ========== " + inputLength);
-	System.out.println("length ========== " + length);
+//	System.out.println("rs =========== " + rs.length);
+//	System.out.println("index ========== " + index);
+//	System.out.println("leastLength ========== " + leastLength);
+//	System.out.println("multiple ========== " + multiple);
+//	System.out.println("inputLength ========== " + inputLength);
+//	System.out.println("length ========== " + length);
 	
 	return rs;
     }
@@ -128,24 +161,37 @@ public class DynamicPassword {
 	    System.out.println(b);
 	}
     }
-
-    public static void main(String[] args) {
-//	double a = (1 << 16) / (Math.pow(10, 6) - 1);
-//
-	byte[] key = generateKey(KEY_LENGTH);
-	byte[] rs = generateCode(key);
+    
+    public static long generatePassword(byte[] key, int refreshTime){
 	int minApproach = minApproach(6);
 	int i = minApproach / 8;
 	if(minApproach % 8 > 0){
 	    i++;
 	}
+	
+	byte[] rs = generateCode(key, refreshTime);
 	byte[] data = compressBytes(rs, i);
-	printBytes(data);
-	String string = Base64.encodeBytes(data);
-	System.out.println(string);
+//	printBytes(data);
+//	String string = Base64.encodeBytes(data);
+//	System.out.println(string);
 	long code = bytesToLong(data);
-	long l = (long) (code & 999999);
-	System.out.println(l);
+	long l = (long) (code & 999999);// 最大的为999999
+	return l;
+    }
+
+    public static void main(String[] args) {
+//	double a = (1 << 16) / (Math.pow(10, 6) - 1);
+//
+	byte[] key = generateKey(KEY_LENGTH);
+	while (true) {
+	    System.out.println("当前动态密码：" + generatePassword(key, DEFAULT_REFRESH_TIME));
+	    System.out.println("当前时间：" + DateHelper.getStringDate());
+	    try {
+		Thread.sleep(1000);
+	    } catch (InterruptedException e) {
+		e.printStackTrace();
+	    }
+	}
 //	long s = bytesToLong(new byte[]{ (byte) 255, (byte) 255 });
 //	System.out.println(s);
     }
@@ -165,7 +211,7 @@ public class DynamicPassword {
 	    max >>= 1;
 	    i++;
 	}
-	int k = 1 << i;
+//	int k = 1 << i;
 //	System.out.println(k);
 //	System.out.println(i);
 	return i;
